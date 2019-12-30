@@ -37,30 +37,41 @@ void ofxStructureCore::update()
 	_isFrameNew = _depthDirty || _irDirty || _visibleDirty;
 	// todo: threadsafe access to internal frame data
 	if ( _depthDirty ) {
-		depthImg.getPixels().setFromPixels( _depthFrame.depthInMillimeters(), _depthFrame.width, _depthFrame.height, 1 );
+		{
+			std::unique_lock<std::mutex> lck( _frameLock );
+			depthImg.getPixels().setFromPixels( _depthFrame.depthInMillimeters(), _depthFrame.width(), _depthFrame.height(), 1 );
+		}
 		depthImg.update();
 		_depthDirty = false;
 	}
 	if ( _irDirty ) {
-		irImg.getPixels().setFromPixels( _irFrame.data(), _irFrame.width, _irFrame.height, 1);
+		{
+			std::unique_lock<std::mutex> lck( _frameLock );
+			irImg.getPixels().setFromPixels( _irFrame.data(), _irFrame.width(), _irFrame.height(), 1 );
+		}
 		irImg.update();
 		_irDirty = false;
 	}
 	if ( _visibleDirty ) {
-		visibleImg.getPixels().setFromPixels(_visibleFrame.rgbData(), _irFrame.width, _irFrame.height, 3);
+		{
+			std::unique_lock<std::mutex> lck( _frameLock );
+			visibleImg.getPixels().setFromPixels( _visibleFrame.rgbData(), _visibleFrame.width(), _visibleFrame.height(), 3 );
+		}
 		visibleImg.update();
 		_visibleDirty = false;
 	}
 }
 
-inline const glm::vec3 ofxStructureCore::getGyroRotationRate() const
+inline const glm::vec3 ofxStructureCore::getGyroRotationRate()
 {
+	std::unique_lock<std::mutex> lck( _frameLock );
 	auto r = _gyroscopeEvent.rotationRate();
 	return {r.x, r.y, r.z};
 }
 
-inline const glm::vec3 ofxStructureCore::getAcceleration() const
+inline const glm::vec3 ofxStructureCore::getAcceleration()
 {
+	std::unique_lock<std::mutex> lck( _frameLock );
 	auto a = _accelerometerEvent.acceleration();
 	return {a.x, a.y, a.z};
 }
@@ -102,45 +113,54 @@ inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 
 	switch ( frame.type ) {
 		case Frame::Type::DepthFrame: {
+			std::unique_lock<std::mutex> lck( _frameLock );
 			_depthFrame = frame.depthFrame;
 			_depthDirty = true;  // update the pix/tex in update() loop
 		} break;
 
 		case Frame::Type::VisibleFrame: {
+			std::unique_lock<std::mutex> lck( _frameLock );
 			_visibleFrame = frame.visibleFrame;
 			_visibleDirty = true;
 		} break;
 
 		case Frame::Type::InfraredFrame: {
+			std::unique_lock<std::mutex> lck( _frameLock );
 			_irFrame = frame.infraredFrame;
 			_irDirty = true;
 		} break;
 
 		case Frame::Type::SynchronizedFrames: {
 			if ( frame.depthFrame.isValid() ) {
+				std::unique_lock<std::mutex> lck( _frameLock );
 				_depthFrame = frame.depthFrame;
 				_depthDirty = true;
 			}
 			if ( frame.visibleFrame.isValid() ) {
+				std::unique_lock<std::mutex> lck( _frameLock );
 				_visibleFrame = frame.visibleFrame;
 				_visibleDirty = true;
 			}
 			if ( frame.infraredFrame.isValid() ) {
+				std::unique_lock<std::mutex> lck( _frameLock );
 				_irFrame = frame.infraredFrame;
 				_irDirty = true;
 			}
 		} break;
 
-		case Frame::Type::AccelerometerEvent:
+		case Frame::Type::AccelerometerEvent: {
+			std::unique_lock<std::mutex> lck( _frameLock );
 			_accelerometerEvent = frame.accelerometerEvent;
-			break;
+		} break;
 
-		case Frame::Type::GyroscopeEvent:
+		case Frame::Type::GyroscopeEvent: {
+			std::unique_lock<std::mutex> lck( _frameLock );
 			_gyroscopeEvent = frame.gyroscopeEvent;
-			break;
+		} break;
 
-		default:
+		default: {
 			ofLogWarning( ofx_module() ) << "Unhandled frame type: " << Frame::toString( frame.type );
+		}
 			return;
 	}
 }

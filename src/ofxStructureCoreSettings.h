@@ -14,7 +14,7 @@ namespace structure {
 		const char*& deviceId = structureCore.sensorSerial;  // ref to the char array
 
 		bool& enableDepth   = structureCore.depthEnabled;
-		bool& enableVisible = structureCore.depthEnabled;
+		bool& enableVisible = structureCore.visibleEnabled;
 		bool& enableIr      = structureCore.infraredEnabled;
 		bool& enableAcc     = structureCore.accelerometerEnabled;
 		bool& enableGyro    = structureCore.gyroscopeEnabled;
@@ -76,7 +76,7 @@ namespace structure {
 			enableAcc       = false;
 			enableGyro      = false;
 
-			calibrationMode = CalibrationMode::OneShotPersistent;  // re-calibrate on device boot
+			//calibrationMode = CalibrationMode::OneShotPersistent;  // re-calibrate on device boot
 		}
 
 		// todo: addt'l settings?

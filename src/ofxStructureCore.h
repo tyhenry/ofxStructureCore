@@ -24,8 +24,8 @@ public:
 	const bool isStreaming() const { return _isStreaming; }
 	const std::string serial() const { return _captureSession.sensorInfo().serialNumber; }
 
-	const glm::vec3 getGyroRotationRate() const;
-	const glm::vec3 getAcceleration() const;
+	const glm::vec3 getGyroRotationRate();
+	const glm::vec3 getAcceleration();
 
 	// static methods
 	static std::vector<std::string> listDevices( bool bLog );
@@ -37,6 +37,8 @@ public:
 
 protected:
 	ST::CaptureSession _captureSession;
+
+	std::mutex _frameLock;	// delegate receives frames on background thread
 
 	// latest frames / events
 	ST::DepthFrame _depthFrame;
@@ -69,7 +71,7 @@ public:
 		if ( session == &_captureSession )
 			handleSessionEvent( evt );
 		else
-			ofLogError( __FUNCTION__ ) << "Received capture session event for unknown capture session: " << ( int )session;
+			ofLogError( ofx_module() ) << "Received capture session event for unknown capture session: " << ( int )session;
 	}
 	void captureSessionDidOutputSample( ST::CaptureSession*, const ST::CaptureSessionSample& sample ) override
 	{

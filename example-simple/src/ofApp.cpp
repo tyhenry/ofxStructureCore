@@ -12,11 +12,17 @@ void ofApp::setup()
 //--------------------------------------------------------------
 void ofApp::update()
 {
+	structure.update();
+	ofSetWindowTitle( ofToString( ofGetFrameRate(), 2) + " FPS");
 }
 
 //--------------------------------------------------------------
 void ofApp::draw()
 {
+	ofScale(.25);
+	structure.depthImg.draw(0,0);
+	structure.irImg.draw(0, structure.depthImg.getHeight());
+	structure.visibleImg.draw(0, structure.depthImg.getHeight() + structure.irImg.getHeight());
 }
 
 //--------------------------------------------------------------
