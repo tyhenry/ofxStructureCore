@@ -3,8 +3,9 @@
 //--------------------------------------------------------------
 void ofApp::setup()
 {
+	ofBackground( 0 );
 	ofxStructureCore::setLogLevel( OF_LOG_VERBOSE );
-	ofxStructureCore::listDevices(true);
+	ofxStructureCore::listDevices( true );
 	structure.setup( ofxStructureCore::Settings() );
 	structure.start();
 }
@@ -13,16 +14,29 @@ void ofApp::setup()
 void ofApp::update()
 {
 	structure.update();
-	ofSetWindowTitle( ofToString( ofGetFrameRate(), 2) + " FPS");
+	ofSetWindowTitle( ofToString( ofGetFrameRate(), 2 ) + " FPS" );
 }
 
 //--------------------------------------------------------------
 void ofApp::draw()
 {
-	ofScale(.25);
-	structure.depthImg.draw(0,0);
+	// scale to fit images vertically:
+	float scale = ofGetHeight() /
+		(structure.depthImg.getHeight() + structure.irImg.getHeight() + structure.visibleImg.getHeight());
+	ofScale(scale);
+	structure.depthImg.draw(0, 0);
 	structure.irImg.draw(0, structure.depthImg.getHeight());
 	structure.visibleImg.draw(0, structure.depthImg.getHeight() + structure.irImg.getHeight());
+
+	cam.begin();
+	ofEnableDepthTest();
+	ofRotateYDeg( 180 );
+	ofRotateZDeg( 180 );
+	ofDrawAxis( 100 );
+	structure.vbo.draw( GL_POINTS, 0, structure.vbo.getNumVertices() );
+	ofDisableDepthTest();
+	cam.end();
+
 }
 
 //--------------------------------------------------------------

@@ -25,4 +25,5 @@ public:
 	void gotMessage( ofMessage msg );
 
 	ofxStructureCore structure;
+	ofEasyCam cam;
 };
