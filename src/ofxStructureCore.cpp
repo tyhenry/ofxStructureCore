@@ -235,8 +235,8 @@ void ofxStructureCore::updatePointCloud()
 	vbo.setVertexData( pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW );
 
 	// test read back buffer:
-	auto data = vbo.getVertexBuffer().map<glm::vec3>(GL_READ_ONLY);
-	std::copy_n(data, nVerts, pointcloud.vertices.data());
-	vbo.getVertexBuffer().unmap();
-	vbo.setVertexData(pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW);
+	//auto data = vbo.getVertexBuffer().map<glm::vec3>(GL_READ_ONLY);
+	//std::copy_n(data, nVerts, pointcloud.vertices.data());
+	//vbo.getVertexBuffer().unmap();
+	//vbo.setVertexData(pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW);
 }
