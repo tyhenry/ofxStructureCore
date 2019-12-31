@@ -13,11 +13,12 @@ namespace structure {
 
 		const char*& deviceId = structureCore.sensorSerial;  // ref to the char array
 
-		bool& enableDepth   = structureCore.depthEnabled;
-		bool& enableVisible = structureCore.visibleEnabled;
-		bool& enableIr      = structureCore.infraredEnabled;
-		bool& enableAcc     = structureCore.accelerometerEnabled;
-		bool& enableGyro    = structureCore.gyroscopeEnabled;
+		bool& enableDepth        = structureCore.depthEnabled;
+		bool& enableVisible      = structureCore.visibleEnabled;
+		bool& enableIr           = structureCore.infraredEnabled;
+		bool& enableAcc          = structureCore.accelerometerEnabled;
+		bool& enableGyro         = structureCore.gyroscopeEnabled;
+		bool& enableDepthCleaner = ST::CaptureSessionSettings::applyExpensiveCorrection;
 
 		float& depthFps   = structureCore.depthFramerate;
 		float& irFps      = structureCore.infraredFramerate;
@@ -46,35 +47,35 @@ namespace structure {
 			ST::CaptureSessionSettings::minMaxDepthInMmOfDepthRangeMode( mode, min, max );
 		}
 
-		/* more options inside structureCore.
-			{
-				ST::StructureCoreDemosaicMethod demosaicMethod                 = ST::StructureCoreDemosaicMethod::Default;
-				ST::StructureCoreBootMode bootMode                             = ST::StructureCoreBootMode::Default;
-				const char* firmwareBootPath                                   = nullptr;
-				int sensorInitializationTimeout                                = 6000;
-				float initialVisibleExposure                                   = 0.016f;
-				float initialVisibleGain                                       = 2.0f;
-				bool visibleApplyGammaCorrection                               = true;
-				bool disableInfraredIntensityBalance                           = true;
-				bool latencyReducerEnabled                                     = true;
-			}
-			*/
+		// more options inside structureCore.
+		//{
+		//	ST::StructureCoreDemosaicMethod demosaicMethod = ST::StructureCoreDemosaicMethod::Default;
+		//	ST::StructureCoreBootMode bootMode             = ST::StructureCoreBootMode::Default;
+		//	const char* firmwareBootPath                   = nullptr;
+		//	int sensorInitializationTimeout                = 6000;
+		//	float initialVisibleExposure                   = 0.016f;
+		//	float initialVisibleGain                       = 2.0f;
+		//	bool visibleApplyGammaCorrection               = true;
+		//	bool disableInfraredIntensityBalance           = true;
+		//	bool latencyReducerEnabled                     = true;
+		//}
 
 		Settings()
 		{
-			// capture device
+			// capture device type
 			source = ST::CaptureSessionSourceId::StructureCore;  // todo: stream from OCC file
 
-			//deviceId = "001";  // set to serial (char*) to specify a device, otherwise first available
+			//deviceId = "001";  // (char*) set to serial to specify a device, otherwise first available
 
 			// defaults:
-			enableDepth     = true;
-			enableVisible   = true;
-			enableIr        = true;
-			depthResolution = DepthResolution::_1280x960;  // SXGA
-			depthRangeMode  = DepthRangeMode::Hybrid;
-			enableAcc       = false;
-			enableGyro      = false;
+			enableDepth        = true;
+			enableVisible      = true;
+			enableIr           = true;
+			depthResolution    = DepthResolution::_1280x960;  // SXGA
+			depthRangeMode     = DepthRangeMode::Medium;      // 0.52m - 5.23m
+			enableAcc          = false;
+			enableGyro         = false;
+			enableDepthCleaner = true;  // apply expensive depth correction to stream
 
 			//calibrationMode = CalibrationMode::OneShotPersistent;  // re-calibrate on device boot
 		}

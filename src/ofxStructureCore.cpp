@@ -42,6 +42,8 @@ void ofxStructureCore::update()
 			depthImg.getPixels().setFromPixels( _depthFrame.depthInMillimeters(), _depthFrame.width(), _depthFrame.height(), 1 );
 		}
 		depthImg.update();
+		// update point cloud
+		updatePointCloud();
 		_depthDirty = false;
 	}
 	if ( _irDirty ) {
@@ -160,8 +162,15 @@ inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 
 		default: {
 			ofLogWarning( ofx_module() ) << "Unhandled frame type: " << Frame::toString( frame.type );
-		}
-			return;
+		} break;
+	}
+	if (_depthDirty  && _depthProjectionMatrix == glm::mat4(1)) {
+		_depthProjectionMatrix = glm::make_mat4(_depthFrame.glProjectionMatrix().m);
+		_depthIntrinsics = _depthFrame.intrinsics();
+		ofLogNotice() << "\n----------------------\n" << _depthProjectionMatrix
+			<< "\n----------------------\n"
+			<< "cx: " << _depthIntrinsics.cx << ", cy: " << _depthIntrinsics.cy << "\n"
+			<< "fx: " << _depthIntrinsics.fx << ", fy: " << _depthIntrinsics.fy;
 	}
 }
 
@@ -196,4 +205,38 @@ inline void ofxStructureCore::handleSessionEvent( EventType evt )
 		default:
 			ofLogWarning( ofx_module() ) << "Sensor " << id << " - Unhandled capture session event type: " << Frame::toString( evt );
 	}
+}
+
+void ofxStructureCore::updatePointCloud()
+{
+
+	int cols     = depthImg.getWidth();
+	int rows     = depthImg.getHeight();
+	auto& depths = depthImg.getPixels();
+
+	float _fx = _depthIntrinsics.fx;
+	float _fy = _depthIntrinsics.fy;
+	float _cx = _depthIntrinsics.cx;
+	float _cy = _depthIntrinsics.cy;
+
+	size_t nVerts = rows * cols;
+	pointcloud.vertices.resize( nVerts );
+	for ( int r = 0; r < rows; r++ ) {
+		for ( int c = 0; c < cols; c++ ) {
+			int i       = r * cols + c;
+			float depth = depths[i];	// millimeters
+			// project depth image into metric space
+			// see: http://nicolas.burrus.name/index.php/Research/KinectCalibration
+			pointcloud.vertices[i].x  = depth * ( c - _cx ) / _fx;
+			pointcloud.vertices[i].y  = depth * ( r - _cy ) / _fy;
+			pointcloud.vertices[i].z  = depth;
+		}
+	}
+	vbo.setVertexData( pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW );
+
+	// test read back buffer:
+	auto data = vbo.getVertexBuffer().map<glm::vec3>(GL_READ_ONLY);
+	std::copy_n(data, nVerts, pointcloud.vertices.data());
+	vbo.getVertexBuffer().unmap();
+	vbo.setVertexData(pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW);
 }

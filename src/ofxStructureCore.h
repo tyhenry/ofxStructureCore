@@ -34,11 +34,18 @@ public:
 	ofFloatImage depthImg;  // float data is in mm (0 - 65355)
 	ofShortImage irImg;
 	ofImage visibleImg;
+	ofVbo vbo;
+	struct PointCloud {
+		std::vector<glm::vec3> vertices;
+		int width, height;
+	} pointcloud;
+	glm::mat4 _depthProjectionMatrix = glm::mat4(1);
 
 protected:
 	ST::CaptureSession _captureSession;
+	Settings _settings;
 
-	std::mutex _frameLock;	// delegate receives frames on background thread
+	std::mutex _frameLock;  // delegate receives frames on background thread
 
 	// latest frames / events
 	ST::DepthFrame _depthFrame;
@@ -51,12 +58,15 @@ protected:
 	bool _streamOnReady = false;  // start streaming when Ready event received
 	bool _isFrameNew    = false;
 	bool _depthDirty, _irDirty, _visibleDirty = false;
+	ST::Intrinsics _depthIntrinsics;
 
 	using Frame = ST::CaptureSessionSample;
 	void handleNewFrame( const Frame& frame );
 
 	using EventType = ST::CaptureSessionEventId;
 	void handleSessionEvent( EventType evt );
+
+	void updatePointCloud();
 
 	static inline const std::string& ofx_module()
 	{
