@@ -40,6 +40,7 @@ void ofxStructureCore::update()
 		{
 			std::unique_lock<std::mutex> lck( _frameLock );
 			depthImg.getPixels().setFromPixels( _depthFrame.depthInMillimeters(), _depthFrame.width(), _depthFrame.height(), 1 );
+			_depthIntrinsics = _depthFrame.intrinsics();
 		}
 		depthImg.update();
 		// update point cloud
@@ -111,7 +112,6 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 
 inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 {
-	std::stringstream data_ss;
 
 	switch ( frame.type ) {
 		case Frame::Type::DepthFrame: {
@@ -164,14 +164,6 @@ inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 			ofLogWarning( ofx_module() ) << "Unhandled frame type: " << Frame::toString( frame.type );
 		} break;
 	}
-	if (_depthDirty  && _depthProjectionMatrix == glm::mat4(1)) {
-		_depthProjectionMatrix = glm::make_mat4(_depthFrame.glProjectionMatrix().m);
-		_depthIntrinsics = _depthFrame.intrinsics();
-		ofLogNotice() << "\n----------------------\n" << _depthProjectionMatrix
-			<< "\n----------------------\n"
-			<< "cx: " << _depthIntrinsics.cx << ", cy: " << _depthIntrinsics.cy << "\n"
-			<< "fx: " << _depthIntrinsics.fx << ", fy: " << _depthIntrinsics.fy;
-	}
 }
 
 inline void ofxStructureCore::handleSessionEvent( EventType evt )
@@ -210,33 +202,87 @@ inline void ofxStructureCore::handleSessionEvent( EventType evt )
 void ofxStructureCore::updatePointCloud()
 {
 
-	int cols     = depthImg.getWidth();
-	int rows     = depthImg.getHeight();
-	auto& depths = depthImg.getPixels();
+	int cols = depthImg.getWidth();
+	int rows = depthImg.getHeight();
 
 	float _fx = _depthIntrinsics.fx;
 	float _fy = _depthIntrinsics.fy;
 	float _cx = _depthIntrinsics.cx;
 	float _cy = _depthIntrinsics.cy;
 
-	size_t nVerts = rows * cols;
-	pointcloud.vertices.resize( nVerts );
-	for ( int r = 0; r < rows; r++ ) {
-		for ( int c = 0; c < cols; c++ ) {
-			int i       = r * cols + c;
-			float depth = depths[i];	// millimeters
-			// project depth image into metric space
-			// see: http://nicolas.burrus.name/index.php/Research/KinectCalibration
-			pointcloud.vertices[i].x  = depth * ( c - _cx ) / _fx;
-			pointcloud.vertices[i].y  = depth * ( r - _cy ) / _fy;
-			pointcloud.vertices[i].z  = depth;
-		}
-	}
-	vbo.setVertexData( pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW );
+	size_t nVerts     = rows * cols;
+	pointcloud.width  = cols;
+	pointcloud.height = rows;
 
-	// test read back buffer:
-	//auto data = vbo.getVertexBuffer().map<glm::vec3>(GL_READ_ONLY);
-	//std::copy_n(data, nVerts, pointcloud.vertices.data());
-	//vbo.getVertexBuffer().unmap();
-	//vbo.setVertexData(pointcloud.vertices.data(), nVerts, GL_STATIC_DRAW);
+	if ( ofIsGLProgrammableRenderer() ) {
+		// use tranfsorm feedback to calc point cloud on gpu
+
+		// load shader
+		if ( !_transformFbShader.isLoaded() ) {
+			ofShader::TransformFeedbackSettings settings;
+			settings.shaderSources[GL_VERTEX_SHADER] = ofx::structure::depth_to_points_vert_shader;
+			settings.bindDefaults                    = false;
+			settings.varyingsToCapture               = {"vPosition"};
+			if ( _transformFbShader.setup( settings ) ) {
+				ofLogVerbose( ofx_module() ) << "Loaded transform feedback shader.";
+			} else {
+				ofLogError( ofx_module() ) << "Error loading transform feedback shader!";
+			}
+		}
+
+		// allocate transform input vbo (with blank vert data)
+		if ( _transformFbVbo.getNumVertices() != nVerts ) {
+			std::vector<glm::vec3> tmp( nVerts );
+			_transformFbVbo.setVertexData( tmp.data(), nVerts, GL_STATIC_DRAW );
+
+			// set static tex coord data here for point cloud vbo since we are updating the size anyway
+			std::vector<glm::vec2> tcs( nVerts );
+			for (int i = 0; i < nVerts; ++i) {
+				tcs[i] = glm::vec2( i % pointcloud.width , i / pointcloud.width );	// todo: normalized tex coords?
+			}
+			pointcloud.vbo.setTexCoordData( tcs.data(), tcs.size(), GL_STATIC_DRAW );
+		}
+
+		// allocate transform output buffer
+		size_t bufSz = nVerts * sizeof( glm::vec3 );
+		if ( _transformFbBuffer.size() != bufSz ) {
+			// todo: profile usage hints? GL_STREAM_READ is a guess, see: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glBufferData.xhtml
+			_transformFbBuffer.allocate( bufSz, GL_STREAM_READ );	
+		}
+
+		// perform transform feedback
+		_transformFbShader.beginTransformFeedback( GL_POINTS, _transformFbBuffer );
+		{
+			_transformFbShader.setUniformTexture( "uDepthTex", depthImg.getTexture(), 1 );
+			_transformFbShader.setUniform2i( "uDepthDims", cols, rows );
+			_transformFbShader.setUniform2f( "uC", _depthIntrinsics.cx, _depthIntrinsics.cy );
+			_transformFbShader.setUniform2f( "uF", _depthIntrinsics.fx, _depthIntrinsics.fy );
+			_transformFbVbo.draw( GL_POINTS, 0, _transformFbVbo.getNumVertices() );
+		}
+		_transformFbShader.endTransformFeedback( _transformFbBuffer );
+
+		// set vbo to use the output buffer
+		pointcloud.vbo.setVertexBuffer( _transformFbBuffer, 3, sizeof( glm::vec3 ), 0 );
+
+		// todo: map memory to point cloud vertices on CPU?
+		// vbo.getVertexBuffer().map<glm::vec3>(GL_READ_ONLY);
+
+	} else {
+
+		// build point cloud on cpu
+		auto& depths = depthImg.getPixels();
+		std::vector<glm::vec3> verts( nVerts );
+		for ( int r = 0; r < rows; r++ ) {
+			for ( int c = 0; c < cols; c++ ) {
+				int i       = r * cols + c;
+				float depth = depths[i];  // millimeters
+				// project depth image into metric space
+				// see: http://nicolas.burrus.name/index.php/Research/KinectCalibration
+				verts[i].x = depth * ( c - _cx ) / _fx * -1.;	// invert x axis for opengl
+				verts[i].y = depth * ( r - _cy ) / _fy * -1.;	// invert y axis for opengl
+				verts[i].z = depth;
+			}
+		}
+		pointcloud.vbo.setVertexData( verts.data(), nVerts, GL_STREAM_DRAW );	// upload to GPU
+	}
 }

@@ -7,6 +7,7 @@
 #include "ST/Utilities.h"
 
 #include "ofxStructureCoreSettings.h"
+#include "ofxStructureCoreUtils.h"
 
 class ofxStructureCore : public ST::CaptureSessionDelegate
 {
@@ -34,12 +35,12 @@ public:
 	ofFloatImage depthImg;  // float data is in mm (0 - 65355)
 	ofShortImage irImg;
 	ofImage visibleImg;
-	ofVbo vbo;
+
 	struct PointCloud {
-		std::vector<glm::vec3> vertices;
+		ofVbo vbo;
 		int width, height;
+		void draw() { vbo.draw( GL_POINTS, 0, vbo.getNumVertices() ); }
 	} pointcloud;
-	glm::mat4 _depthProjectionMatrix = glm::mat4(1);
 
 protected:
 	ST::CaptureSession _captureSession;
@@ -55,10 +56,13 @@ protected:
 	ST::AccelerometerEvent _accelerometerEvent;
 
 	bool _isStreaming   = false;
-	bool _streamOnReady = false;  // start streaming when Ready event received
+	bool _streamOnReady = false;		// start streaming when Ready event received
 	bool _isFrameNew    = false;
 	bool _depthDirty, _irDirty, _visibleDirty = false;
 	ST::Intrinsics _depthIntrinsics;
+	ofShader _transformFbShader;		// converts depth image to point cloud
+	ofBufferObject _transformFbBuffer;	// gpu buffer for point cloud
+	ofVbo _transformFbVbo;				// static vbo for transform fb
 
 	using Frame = ST::CaptureSessionSample;
 	void handleNewFrame( const Frame& frame );
