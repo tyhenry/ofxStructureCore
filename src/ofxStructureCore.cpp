@@ -107,7 +107,7 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 {
 
 	std::vector<std::string> devices;
-	const ST::ConnectedSensorInfo* sensors[10];
+	const ST::ConnectedSensorInfo* sensors[] { nullptr, nullptr, nullptr };
 	int count;
 	ST::enumerateConnectedSensors( sensors, &count );
 	std::stringstream devices_ss;

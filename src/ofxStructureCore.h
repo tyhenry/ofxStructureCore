@@ -1,11 +1,9 @@
-#include "ofMain.h"
-
 #include "ST/CameraFrames.h"
 #include "ST/CaptureSession.h"
 #include "ST/IMUEvents.h"
 #include "ST/OCCFileWriter.h"
 #include "ST/Utilities.h"
-
+#include "ofMain.h"
 #include "ofxStructureCoreSettings.h"
 #include "ofxStructureCoreUtils.h"
 
@@ -23,7 +21,7 @@ public:
 
 	const bool isFrameNew() const { return _isFrameNew; }
 	const bool isStreaming() const { return _isStreaming; }
-	const std::string serial() const { return _captureSession.sensorInfo().serialNumber; }
+	const std::string serial() const { return std::string( &_captureSession.sensorInfo().serialNumber[0] ); }
 
 	const glm::vec3 getGyroRotationRate();
 	const glm::vec3 getAcceleration();
@@ -36,10 +34,15 @@ public:
 	ofShortImage irImg;
 	ofImage visibleImg;
 
-	struct PointCloud {
+	struct PointCloud
+	{
 		ofVbo vbo;
 		int width, height;
-		void draw() { ofLogNotice() << "drawing point cloud";  vbo.draw( GL_POINTS, 0, vbo.getNumVertices() ); }
+		void draw()
+		{
+			ofLogNotice() << "drawing point cloud";
+			vbo.draw( GL_POINTS, 0, vbo.getNumVertices() );
+		}
 	} pointcloud;
 
 protected:
@@ -58,13 +61,13 @@ protected:
 	ST::AccelerometerEvent _accelerometerEvent;
 
 	bool _isStreaming   = false;
-	bool _streamOnReady = false;		// start streaming when Ready event received
+	bool _streamOnReady = false;  // start streaming when Ready event received
 	bool _isFrameNew    = false;
 	bool _depthDirty, _irDirty, _visibleDirty = false;
 	ST::Intrinsics _depthIntrinsics;
-	ofShader _transformFbShader;		// converts depth image to point cloud
-	ofBufferObject _transformFbBuffer;	// gpu buffer for point cloud
-	ofVbo _transformFbVbo;				// static vbo for transform fb
+	ofShader _transformFbShader;        // converts depth image to point cloud
+	ofBufferObject _transformFbBuffer;  // gpu buffer for point cloud
+	ofVbo _transformFbVbo;              // static vbo for transform fb
 
 	using Frame = ST::CaptureSessionSample;
 	void handleNewFrame( const Frame& frame );
