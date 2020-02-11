@@ -4,16 +4,21 @@
 void ofApp::setup()
 {
 	ofBackground( 0 );
+	//ofDisableArbTex();
+
+	ofSetVerticalSync( true );
 	ofxStructureCore::setLogLevel( OF_LOG_VERBOSE );
-	ofxStructureCore::listDevices( true );
+	auto devices = ofxStructureCore::listDevices( true );
 
 	ofxStructureCore::Settings settings;
-	settings.depthResolution          = ofxStructureCore::Settings::DepthResolution::_1280x960;
-	settings.applyExpensiveCorrection = true;
-	settings.depthRangeMode           = ofxStructureCore::Settings::DepthRangeMode::Hybrid;
+	settings.structureCore.depthResolution = ofxStructureCore::Settings::DepthResolution::_1280x960;
+	settings.applyExpensiveCorrection      = true;
+	settings.structureCore.depthRangeMode  = ofxStructureCore::Settings::DepthRangeMode::Hybrid;
+	settings.setSerial( devices[0] );	// one option for specifying a specific camera by serial number
 
-	structure.setup( settings );
-	structure.start();
+	if ( structure.setup( settings ) ) {
+		structure.start();
+	}
 }
 
 //--------------------------------------------------------------
@@ -41,7 +46,6 @@ void ofApp::draw()
 
 	cam.begin();
 	ofEnableDepthTest();
-	ofRotateYDeg( 180 );
 	ofDrawAxis( 100 );
 	structure.pointcloud.draw();
 	ofDisableDepthTest();

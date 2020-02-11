@@ -39,7 +39,7 @@ public:
 	struct PointCloud {
 		ofVbo vbo;
 		int width, height;
-		void draw() { vbo.draw( GL_POINTS, 0, vbo.getNumVertices() ); }
+		void draw() { ofLogNotice() << "drawing point cloud";  vbo.draw( GL_POINTS, 0, vbo.getNumVertices() ); }
 	} pointcloud;
 
 protected:
@@ -47,6 +47,8 @@ protected:
 	Settings _settings;
 
 	std::mutex _frameLock;  // delegate receives frames on background thread
+
+	float _lastFrameT, _fps, _lastDepthUpdateT, _depthUpdateFps;
 
 	// latest frames / events
 	ST::DepthFrame _depthFrame;

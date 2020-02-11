@@ -9,8 +9,10 @@ bool ofxStructureCore::setup( const Settings& settings )
 {
 	if ( _captureSession.startMonitoring( settings ) ) {
 		ofLogNotice( ofx_module() ) << "Sensor " << serial() << " initialized.";
+		return true;
 	} else {
 		ofLogError( ofx_module() ) << "Sensor " << serial() << " failed to initialize.";
+		return false;
 	}
 }
 
@@ -34,10 +36,25 @@ void ofxStructureCore::stop()
 
 void ofxStructureCore::update()
 {
+	// wrap in ofEnableArbTex() to enforce rect tex coords internally
+	bool wasUsingArbTex = ofGetUsingArbTex();
+	ofEnableArbTex();
+
 	_isFrameNew = _depthDirty || _irDirty || _visibleDirty;
 	// todo: threadsafe access to internal frame data
 	if ( _depthDirty ) {
 		{
+			float t = ofGetElapsedTimef();
+			if ( _lastDepthUpdateT == 0. ) {
+				_lastDepthUpdateT = t;
+				_depthUpdateFps   = 0.;
+			} else {
+				float diff        = t - _lastDepthUpdateT;
+				_depthUpdateFps   = 1. / diff;
+				_lastDepthUpdateT = t;
+				//ofLogNotice( ofx_module() ) << __FUNCTION__ << ": fps = " << ofToString( _depthUpdateFps, 1 ) << ", diff = " << ofToString( diff * 1000., 2 ) << "ms";
+			}
+
 			std::unique_lock<std::mutex> lck( _frameLock );
 			depthImg.getPixels().setFromPixels( _depthFrame.depthInMillimeters(), _depthFrame.width(), _depthFrame.height(), 1 );
 			_depthIntrinsics = _depthFrame.intrinsics();
@@ -63,20 +80,25 @@ void ofxStructureCore::update()
 		visibleImg.update();
 		_visibleDirty = false;
 	}
+
+	// restore state
+	if (!wasUsingArbTex) {
+		ofDisableArbTex();
+	}
 }
 
 inline const glm::vec3 ofxStructureCore::getGyroRotationRate()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto r = _gyroscopeEvent.rotationRate();
-	return {r.x, r.y, r.z};
+	return { r.x, r.y, r.z };
 }
 
 inline const glm::vec3 ofxStructureCore::getAcceleration()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto a = _accelerometerEvent.acceleration();
-	return {a.x, a.y, a.z};
+	return { a.x, a.y, a.z };
 }
 
 // static methods
@@ -99,7 +121,7 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 				           << "available: " << sensors[i]->available << ", "
 				           << "booted: " << sensors[i]->booted << std::endl;
 			}
-			devices.push_back( sensors[i]->serial );
+			devices.emplace_back(&(sensors[i]->serial[0]));
 		}
 	}
 	if ( bLog ) {
@@ -112,6 +134,16 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 
 inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 {
+	if ( _lastFrameT == 0. ) {
+		_lastFrameT = ofGetElapsedTimef();
+		_fps        = 0.;
+	} else {
+		float t     = ofGetElapsedTimef();
+		float diff  = t - _lastFrameT;
+		_fps        = 1. / diff;
+		_lastFrameT = t;
+		//ofLogNotice( ofx_module() ) << __FUNCTION__ << ": fps = " << ofToString( _fps, 1 ) << ", diff = " << ofToString( diff * 1000., 2 ) << "ms";
+	}
 
 	switch ( frame.type ) {
 		case Frame::Type::DepthFrame: {
@@ -222,7 +254,7 @@ void ofxStructureCore::updatePointCloud()
 			ofShader::TransformFeedbackSettings settings;
 			settings.shaderSources[GL_VERTEX_SHADER] = ofx::structure::depth_to_points_vert_shader;
 			settings.bindDefaults                    = false;
-			settings.varyingsToCapture               = {"vPosition"};
+			settings.varyingsToCapture               = { "vPosition" };
 			if ( _transformFbShader.setup( settings ) ) {
 				ofLogVerbose( ofx_module() ) << "Loaded transform feedback shader.";
 			} else {
@@ -237,8 +269,8 @@ void ofxStructureCore::updatePointCloud()
 
 			// set static tex coord data here for point cloud vbo since we are updating the size anyway
 			std::vector<glm::vec2> tcs( nVerts );
-			for (int i = 0; i < nVerts; ++i) {
-				tcs[i] = glm::vec2( i % pointcloud.width , i / pointcloud.width );	// todo: normalized tex coords?
+			for ( int i = 0; i < nVerts; ++i ) {
+				tcs[i] = glm::vec2( i % pointcloud.width, i / pointcloud.width );  // todo: normalized tex coords?
 			}
 			pointcloud.vbo.setTexCoordData( tcs.data(), tcs.size(), GL_STATIC_DRAW );
 		}
@@ -247,7 +279,7 @@ void ofxStructureCore::updatePointCloud()
 		size_t bufSz = nVerts * sizeof( glm::vec3 );
 		if ( _transformFbBuffer.size() != bufSz ) {
 			// todo: profile usage hints? GL_STREAM_READ is a guess, see: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glBufferData.xhtml
-			_transformFbBuffer.allocate( bufSz, GL_STREAM_READ );	
+			_transformFbBuffer.allocate( bufSz, GL_STREAM_READ );
 		}
 
 		// perform transform feedback
@@ -260,6 +292,7 @@ void ofxStructureCore::updatePointCloud()
 			_transformFbVbo.draw( GL_POINTS, 0, _transformFbVbo.getNumVertices() );
 		}
 		_transformFbShader.endTransformFeedback( _transformFbBuffer );
+
 
 		// set vbo to use the output buffer
 		pointcloud.vbo.setVertexBuffer( _transformFbBuffer, 3, sizeof( glm::vec3 ), 0 );
@@ -278,11 +311,11 @@ void ofxStructureCore::updatePointCloud()
 				float depth = depths[i];  // millimeters
 				// project depth image into metric space
 				// see: http://nicolas.burrus.name/index.php/Research/KinectCalibration
-				verts[i].x = depth * ( c - _cx ) / _fx * -1.;	// invert x axis for opengl
-				verts[i].y = depth * ( r - _cy ) / _fy * -1.;	// invert y axis for opengl
+				verts[i].x = depth * ( c - _cx ) / _fx * -1.;  // invert x axis for opengl
+				verts[i].y = depth * ( r - _cy ) / _fy * -1.;  // invert y axis for opengl
 				verts[i].z = depth;
 			}
 		}
-		pointcloud.vbo.setVertexData( verts.data(), nVerts, GL_STREAM_DRAW );	// upload to GPU
+		pointcloud.vbo.setVertexData( verts.data(), nVerts, GL_STREAM_DRAW );  // upload to GPU
 	}
 }
