@@ -7,22 +7,48 @@ ofxStructureCore::ofxStructureCore()
 
 bool ofxStructureCore::setup( const Settings& settings )
 {
+	_settings = settings;
 	if ( _captureSession.startMonitoring( settings ) ) {
-		ofLogNotice( ofx_module() ) << "Sensor " << serial() << " initialized.";
+		ofLogNotice( ofx_module() ) << "Capture session initialized, waiting to start sensor" << (serial().empty() ? "." : "[" + serial() + "]");
 		return true;
 	} else {
-		ofLogError( ofx_module() ) << "Sensor " << serial() << " failed to initialize.";
+		ofLogError( ofx_module() ) << "Capture session failed to initialize!";
 		return false;
 	}
 }
 
-bool ofxStructureCore::start()
+bool ofxStructureCore::start( float timeout )
 {
-	_isStreaming = _captureSession.startStreaming();
+	if ( !_isStreaming ) {
 
-	if ( !_isStreaming && !_streamOnReady ) {
-		ofLogWarning( ofx_module() ) << "Sensor " << serial() << " didn't start, will retry on Ready signal (call stop() to cancel)...";
-		_streamOnReady = true;  // stream when we get the ready signal
+		float start = ofGetElapsedTimef();
+		// note: startStreaming() doesn't seem to return valid bool
+		//	so we instead manage _isStreaming in the async event callback
+		if (!_captureSession.startStreaming()) {
+			ofLogError( ofx_module() ) << "Error while trying to start stream for sensor [" << serial() << "]!  Did you call setup()?";
+			return false;
+		}
+
+		if ( timeout > 0. ) {
+			while ( true ) {
+				std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+				float t = ofGetElapsedTimef();
+				if ( _isStreaming ) {
+					ofLogVerbose( ofx_module() ) << "Sensor [" << serial() << "] started.";
+					break;
+				}
+				if ( t - start > timeout ) {
+					ofLogError( ofx_module() ) << "Sensor [" << serial() << "] couldn't start! Timed out after " << timeout << " seconds.";
+					break;
+				}
+			}
+			_streamOnReady = false;
+		}
+
+		if ( timeout <= 0. && !_isStreaming ) {
+			ofLogWarning( ofx_module() ) << "Sensor [" << serial() << "] didn't start, will retry on Ready signal (call stop() to cancel)...";
+			_streamOnReady = true;  // stream when we get the ready signal
+		}
 	}
 	return _isStreaming;
 }
@@ -82,7 +108,7 @@ void ofxStructureCore::update()
 	}
 
 	// restore state
-	if (!wasUsingArbTex) {
+	if ( !wasUsingArbTex ) {
 		ofDisableArbTex();
 	}
 }
@@ -107,25 +133,25 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 {
 
 	std::vector<std::string> devices;
-	const ST::ConnectedSensorInfo* sensors[] { nullptr, nullptr, nullptr };
+	const ST::ConnectedSensorInfo* sensors[]{ nullptr, nullptr, nullptr };
 	int count;
 	ST::enumerateConnectedSensors( sensors, &count );
 	std::stringstream devices_ss;
 	for ( int i = 0; i < count; ++i ) {
 		if ( sensors && sensors[i] ) {
 			if ( bLog ) {
-				devices_ss << "\n\t"
+				devices_ss << "\n\t" << i << ": "
 				           << "serial [" << sensors[i]->serial << "], "
 				           << "product: " << sensors[i]->product << ", "
 				           << std::boolalpha
 				           << "available: " << sensors[i]->available << ", "
 				           << "booted: " << sensors[i]->booted << std::endl;
 			}
-			devices.emplace_back(&(sensors[i]->serial[0]));
+			devices.emplace_back( &( sensors[i]->serial[0] ) );
 		}
 	}
 	if ( bLog ) {
-		ofLogNotice( ofx_module() ) << "Found " << devices.size() << " devices: " << devices_ss.str();
+		ofLogNotice( ofx_module() ) << "\nFound " << devices.size() << " Structure Core devices: " << devices_ss.str();
 	}
 	return devices;
 }
@@ -200,7 +226,7 @@ inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 
 inline void ofxStructureCore::handleSessionEvent( EventType evt )
 {
-	const std::string id = _captureSession.sensorInfo().serialNumber;
+	const std::string id = serial();
 	switch ( evt ) {
 		case ST::CaptureSessionEventId::Booting:
 			ofLogVerbose( ofx_module() ) << "StructureCore is booting...";
@@ -292,7 +318,6 @@ void ofxStructureCore::updatePointCloud()
 			_transformFbVbo.draw( GL_POINTS, 0, _transformFbVbo.getNumVertices() );
 		}
 		_transformFbShader.endTransformFeedback( _transformFbBuffer );
-
 
 		// set vbo to use the output buffer
 		pointcloud.vbo.setVertexBuffer( _transformFbBuffer, 3, sizeof( glm::vec3 ), 0 );

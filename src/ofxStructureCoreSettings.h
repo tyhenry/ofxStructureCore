@@ -68,12 +68,22 @@ namespace structure {
 
 	struct Settings : public ST::CaptureSessionSettings
 	{
-		void setSerial(const std::string& serial) {
-			auto len = serial.length();
-			char * tmp_str = new char[len + 1];
-			strncpy(tmp_str, serial.c_str(), len);
-			tmp_str[len] = '\0'; // enfore terminate
-			structureCore.sensorSerial = tmp_str;
+	protected:
+		std::string _serial;
+
+	public:
+		void setSerial( const std::string& serial )
+		{
+			_serial = serial;
+			if ( !_serial.empty() ) {
+				structureCore.sensorSerial = _serial.c_str();
+			} else {
+				structureCore.sensorSerial = nullptr;  // first available
+			}
+		}
+		std::string getSerial() const
+		{
+			return structureCore.sensorSerial ? std::string( structureCore.sensorSerial ) : "";
 		}
 
 		// enum / modes:
@@ -89,37 +99,34 @@ namespace structure {
 			ST::CaptureSessionSettings::minMaxDepthInMmOfDepthRangeMode( mode, min, max );
 		}
 
-		// more options inside structureCore.
-		//{
-		//	ST::StructureCoreDemosaicMethod demosaicMethod = ST::StructureCoreDemosaicMethod::Default;
-		//	ST::StructureCoreBootMode bootMode             = ST::StructureCoreBootMode::Default;
-		//	const char* firmwareBootPath                   = nullptr;
-		//	int sensorInitializationTimeout                = 6000;
-		//	float initialVisibleExposure                   = 0.016f;
-		//	float initialVisibleGain                       = 2.0f;
-		//	bool visibleApplyGammaCorrection               = true;
-		//	bool disableInfraredIntensityBalance           = true;
-		//	bool latencyReducerEnabled                     = true;
-		//}
-
 		Settings()
 		{
 			// capture device type
 			source = ST::CaptureSessionSourceId::StructureCore;  // todo: stream from OCC file
 
-			//deviceId = "001";  // (char*) set to serial to specify a device, otherwise first available
-
 			// defaults:
-			structureCore.depthEnabled         = true;
-			structureCore.visibleEnabled       = true;
-			structureCore.infraredEnabled      = true;
-			structureCore.depthResolution      = DepthResolution::_1280x960;  // SXGA
-			structureCore.depthRangeMode       = DepthRangeMode::Medium;      // 0.52m - 5.23m
-			structureCore.accelerometerEnabled = false;
-			structureCore.gyroscopeEnabled     = false;
-			applyExpensiveCorrection           = true;  // apply expensive depth correction to stream
 
-			//calibrationMode = CalibrationMode::OneShotPersistent;  // re-calibrate on device boot
+			structureCore.depthEnabled           = true;
+			structureCore.visibleEnabled         = true;
+			structureCore.infraredEnabled        = true;
+			structureCore.depthResolution        = DepthResolution::_1280x960;  // SXGA
+			structureCore.depthRangeMode         = DepthRangeMode::Medium;      // 0.52m - 5.23m
+			structureCore.accelerometerEnabled   = false;
+			structureCore.gyroscopeEnabled       = false;
+			structureCore.dynamicCalibrationMode = CalibrationMode::OneShotPersistent;  // re-calibrate on device boot
+			applyExpensiveCorrection             = true;                                // apply expensive depth correction to stream
+
+			// more options:
+
+			//structureCore.demosaicMethod                  = ST::StructureCoreDemosaicMethod::Default;  // ST::StructureCoreDemosaicMethod
+			//structureCore.bootMode                        = ST::StructureCoreBootMode::Default;        // ST::StructureCoreBootMode
+			//structureCore.firmwareBootPath                = nullptr;                                   // const char*
+			//structureCore.sensorInitializationTimeout     = 6000;                                      // int
+			//structureCore.initialVisibleExposure          = 0.016f;                                    // float
+			//structureCore.initialVisibleGain              = 2.0f;                                      // float
+			//structureCore.visibleApplyGammaCorrection     = true;                                      // bool
+			//structureCore.disableInfraredIntensityBalance = true;                                      // bool
+			//structureCore.latencyReducerEnabled           = true;                                      // bool
 		}
 
 		// todo: addt'l settings?

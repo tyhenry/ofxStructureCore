@@ -15,13 +15,19 @@ public:
 	ofxStructureCore();
 
 	bool setup( const Settings& settings );  // call to init device
-	bool start();                            // start streaming (if not already)
+	bool start( float timeout = 0.f );       // start streaming (if not already), wait timeout sec for response or if timeout == 0, start async
 	void stop();
 	void update();
 
 	const bool isFrameNew() const { return _isFrameNew; }
 	const bool isStreaming() const { return _isStreaming; }
-	const std::string serial() const { return std::string( &_captureSession.sensorInfo().serialNumber[0] ); }
+	const std::string serial() const { 
+		auto serial = std::string( &_captureSession.sensorInfo().serialNumber[0] ); 
+		if (serial.empty()) {
+			serial = _settings.getSerial();	// no sensor initialzed, fallback to settings
+		}
+		return serial;
+	}
 
 	const glm::vec3 getGyroRotationRate();
 	const glm::vec3 getAcceleration();
@@ -60,7 +66,7 @@ protected:
 	ST::GyroscopeEvent _gyroscopeEvent;
 	ST::AccelerometerEvent _accelerometerEvent;
 
-	bool _isStreaming   = false;
+	std::atomic<bool> _isStreaming   = false;
 	bool _streamOnReady = false;  // start streaming when Ready event received
 	bool _isFrameNew    = false;
 	bool _depthDirty, _irDirty, _visibleDirty = false;
