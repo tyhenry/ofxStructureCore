@@ -19,31 +19,31 @@ namespace structure {
 	inline const std::map<ST::StructureCoreDepthResolution, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDepthResolution, std::string> names = {
-		    { ST::StructureCoreDepthResolution::_320x240, "320x240" },
-		    { ST::StructureCoreDepthResolution::_640x480, "640x480" },
-		    { ST::StructureCoreDepthResolution::_1280x960, "1280x960" },
-		    { ST::StructureCoreDepthResolution::VGA, "VGA" },
-		    { ST::StructureCoreDepthResolution::SXGA, "SXGA" },
-		    { ST::StructureCoreDepthResolution::QVGA, "QVGA" } };
+		    {ST::StructureCoreDepthResolution::_320x240, "320x240"},
+		    {ST::StructureCoreDepthResolution::_640x480, "640x480"},
+		    {ST::StructureCoreDepthResolution::_1280x960, "1280x960"},
+		    {ST::StructureCoreDepthResolution::VGA, "VGA"},
+		    {ST::StructureCoreDepthResolution::SXGA, "SXGA"},
+		    {ST::StructureCoreDepthResolution::QVGA, "QVGA"}};
 		return names;
 	};
 	template <>
 	inline const std::map<ST::StructureCoreDepthRangeMode, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDepthRangeMode, std::string> names = {
-		    { ST::StructureCoreDepthRangeMode::Short, "Short" },
-		    { ST::StructureCoreDepthRangeMode::Medium, "Medium" },
-		    { ST::StructureCoreDepthRangeMode::Long, "Long" },
-		    { ST::StructureCoreDepthRangeMode::Hybrid, "Hybrid" } };
+		    {ST::StructureCoreDepthRangeMode::Short, "Short"},
+		    {ST::StructureCoreDepthRangeMode::Medium, "Medium"},
+		    {ST::StructureCoreDepthRangeMode::Long, "Long"},
+		    {ST::StructureCoreDepthRangeMode::Hybrid, "Hybrid"}};
 		return names;
 	};
 	template <>
 	inline const std::map<ST::StructureCoreDynamicCalibrationMode, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDynamicCalibrationMode, std::string> names = {
-		    { ST::StructureCoreDynamicCalibrationMode::Off, "Off" },
-		    { ST::StructureCoreDynamicCalibrationMode::OneShotPersistent, "OneShotPersistent" },
-		    { ST::StructureCoreDynamicCalibrationMode::ContinuousNonPersistent, "ContinuousNonPersisent" } };
+		    {ST::StructureCoreDynamicCalibrationMode::Off, "Off"},
+		    {ST::StructureCoreDynamicCalibrationMode::OneShotPersistent, "OneShotPersistent"},
+		    {ST::StructureCoreDynamicCalibrationMode::ContinuousNonPersistent, "ContinuousNonPersisent"}};
 		return names;
 	};
 
@@ -72,6 +72,19 @@ namespace structure {
 		std::string _serial;
 
 	public:
+		Settings( const Settings& other )
+		    : ST::CaptureSessionSettings( other )
+		{
+			setSerial( other._serial );
+		}
+
+		Settings& operator=( const Settings& other )
+		{
+			ST::CaptureSessionSettings::operator=( other );
+			setSerial( other._serial );
+			return *this;
+		}
+
 		void setSerial( const std::string& serial )
 		{
 			_serial = serial;

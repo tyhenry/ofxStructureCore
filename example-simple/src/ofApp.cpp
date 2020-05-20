@@ -14,10 +14,10 @@ void ofApp::setup()
 	settings.structureCore.depthResolution = ofxStructureCore::Settings::DepthResolution::_1280x960;
 	settings.applyExpensiveCorrection      = true;
 	settings.structureCore.depthRangeMode  = ofxStructureCore::Settings::DepthRangeMode::Hybrid;
-	settings.setSerial( devices[0] );	// one option for specifying a specific camera by serial number
+	settings.setSerial( devices[0] );  // one option for specifying a specific camera by serial number
 
 	if ( structure.setup( settings ) ) {
-		structure.start();
+		structure.start( 10 );  // wait 10 seconds for ready signal
 	}
 }
 
@@ -31,7 +31,8 @@ void ofApp::update()
 //--------------------------------------------------------------
 void ofApp::draw()
 {
-	if ( !structure.depthImg.isAllocated() ) {
+	//if ( !structure.depthImg.isAllocated() ) {
+	if ( !structure.isStreaming() ) {
 		ofDrawBitmapStringHighlight( "waiting for structure sensor...", 20, 20 );
 		return;
 	}

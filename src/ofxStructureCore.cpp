@@ -7,50 +7,68 @@ ofxStructureCore::ofxStructureCore()
 
 bool ofxStructureCore::setup( const Settings& settings )
 {
-	_settings = settings;
+	_settings      = settings;
+	_isInit        = false;
+	_streamOnReady = false;  // wait until user calls start() to startStreaming()
 	if ( _captureSession.startMonitoring( settings ) ) {
-		ofLogNotice( ofx_module() ) << "Capture session initialized, waiting to start sensor" << (serial().empty() ? "." : "[" + serial() + "]");
+		_isInit = true;
+		ofLogNotice( ofx_module() ) << "Sensor " << ( serial().empty() ? "" : "[" + serial() + "]" ) << " session initialized.";
+		// HACK: if we have requested a serial number, the Structure SDK needs this thread to sleep for a bit before we can call startStreaming()
+		// very weird, but seems like the only fix right now
+		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
 		return true;
 	} else {
-		ofLogError( ofx_module() ) << "Capture session failed to initialize!";
+		ofLogError( ofx_module() ) << "Sensor session failed to initialize!";
 		return false;
 	}
 }
 
 bool ofxStructureCore::start( float timeout )
 {
-	if ( !_isStreaming ) {
+	if ( !_isInit ) {
+		ofLogError( ofx_module() ) << "Can't start stream, sensor [" << serial() << "] not initialized!  Did you call setup()?";
+		return false;
+	}
 
-		float start = ofGetElapsedTimef();
-		// note: startStreaming() doesn't seem to return valid bool
-		//	so we instead manage _isStreaming in the async event callback
-		if (!_captureSession.startStreaming()) {
+	if ( _isStreaming ) {
+		ofLogWarning( ofx_module() ) << "Can't start(), sensor [" << serial() << "] already streaming.";
+		return true;
+	}
+
+	if ( !_isReady ) {
+
+		if ( timeout > 0. ) {
+
+			// block until ready signal received or we timeout
+			float start = ofGetElapsedTimef();
+			while ( !_isReady ) {
+				std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+				if ( ofGetElapsedTimef() - start >= timeout ) {
+					ofLogError( ofx_module() ) << "Sensor [" << serial() << "] didn't start! Timed out after " << timeout << " seconds.";
+					return false;
+				}
+			}
+		} else {
+			ofLogVerbose( ofx_module() ) << "Sensor [" << serial() << "] will start streaming when Ready signal is received (call stop() to cancel)...";
+			_streamOnReady = true;  // start stream when we get the ready signal
+			return true;
+		}
+	}
+
+	if ( _isReady ) {
+
+		if ( _captureSession.startStreaming() ) {
+			ofLogVerbose( ofx_module() ) << "Requested sensor [" << serial() << "] start streaming.";
+			return true;
+
+			// note: startStreaming() doesn't seem to ever return false, even on failure
+			//	_isStreaming managed in the async delegate callback
+		} else {
 			ofLogError( ofx_module() ) << "Error while trying to start stream for sensor [" << serial() << "]!  Did you call setup()?";
 			return false;
 		}
-
-		if ( timeout > 0. ) {
-			while ( true ) {
-				std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-				float t = ofGetElapsedTimef();
-				if ( _isStreaming ) {
-					ofLogVerbose( ofx_module() ) << "Sensor [" << serial() << "] started.";
-					break;
-				}
-				if ( t - start > timeout ) {
-					ofLogError( ofx_module() ) << "Sensor [" << serial() << "] couldn't start! Timed out after " << timeout << " seconds.";
-					break;
-				}
-			}
-			_streamOnReady = false;
-		}
-
-		if ( timeout <= 0. && !_isStreaming ) {
-			ofLogWarning( ofx_module() ) << "Sensor [" << serial() << "] didn't start, will retry on Ready signal (call stop() to cancel)...";
-			_streamOnReady = true;  // stream when we get the ready signal
-		}
 	}
-	return _isStreaming;
+	return false;
 }
 
 void ofxStructureCore::stop()
@@ -62,12 +80,15 @@ void ofxStructureCore::stop()
 
 void ofxStructureCore::update()
 {
+	if ( !_isStreaming ) {
+		return;
+	}
+
 	// wrap in ofEnableArbTex() to enforce rect tex coords internally
 	bool wasUsingArbTex = ofGetUsingArbTex();
 	ofEnableArbTex();
 
 	_isFrameNew = _depthDirty || _irDirty || _visibleDirty;
-	// todo: threadsafe access to internal frame data
 	if ( _depthDirty ) {
 		{
 			float t = ofGetElapsedTimef();
@@ -117,14 +138,14 @@ inline const glm::vec3 ofxStructureCore::getGyroRotationRate()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto r = _gyroscopeEvent.rotationRate();
-	return { r.x, r.y, r.z };
+	return {r.x, r.y, r.z};
 }
 
 inline const glm::vec3 ofxStructureCore::getAcceleration()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto a = _accelerometerEvent.acceleration();
-	return { a.x, a.y, a.z };
+	return {a.x, a.y, a.z};
 }
 
 // static methods
@@ -133,7 +154,7 @@ std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 {
 
 	std::vector<std::string> devices;
-	const ST::ConnectedSensorInfo* sensors[]{ nullptr, nullptr, nullptr };
+	const ST::ConnectedSensorInfo* sensors[]{nullptr, nullptr, nullptr};
 	int count;
 	ST::enumerateConnectedSensors( sensors, &count );
 	std::stringstream devices_ss;
@@ -233,9 +254,9 @@ inline void ofxStructureCore::handleSessionEvent( EventType evt )
 			break;
 		case ST::CaptureSessionEventId::Ready:
 			ofLogNotice( ofx_module() ) << "Sensor " << id << " is ready.";
+			_isReady = true;
 			if ( _streamOnReady ) {
-				ofLogNotice( ofx_module() ) << "Sensor " << id << " is starting...";
-				start();
+				start( 0. );  // start streaming
 			}
 			break;
 		case ST::CaptureSessionEventId::Connected:
@@ -280,7 +301,7 @@ void ofxStructureCore::updatePointCloud()
 			ofShader::TransformFeedbackSettings settings;
 			settings.shaderSources[GL_VERTEX_SHADER] = ofx::structure::depth_to_points_vert_shader;
 			settings.bindDefaults                    = false;
-			settings.varyingsToCapture               = { "vPosition" };
+			settings.varyingsToCapture               = {"vPosition"};
 			if ( _transformFbShader.setup( settings ) ) {
 				ofLogVerbose( ofx_module() ) << "Loaded transform feedback shader.";
 			} else {

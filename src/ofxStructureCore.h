@@ -20,11 +20,14 @@ public:
 	void update();
 
 	const bool isFrameNew() const { return _isFrameNew; }
-	const bool isStreaming() const { return _isStreaming; }
-	const std::string serial() const { 
-		auto serial = std::string( &_captureSession.sensorInfo().serialNumber[0] ); 
-		if (serial.empty()) {
-			serial = _settings.getSerial();	// no sensor initialzed, fallback to settings
+	const bool isInit() const { return _isInit; }            // setup() was called
+	const bool isReady() const { return _isReady; }          // sensor is ready to start()
+	const bool isStreaming() const { return _isStreaming; }  // sensor has started
+	const std::string serial() const
+	{
+		auto serial = std::string( &_captureSession.sensorInfo().serialNumber[0] );
+		if ( serial.empty() ) {
+			serial = _settings.getSerial();  // no sensor initialzed, fallback to settings
 		}
 		return serial;
 	}
@@ -46,7 +49,6 @@ public:
 		int width, height;
 		void draw()
 		{
-			ofLogNotice() << "drawing point cloud";
 			vbo.draw( GL_POINTS, 0, vbo.getNumVertices() );
 		}
 	} pointcloud;
@@ -66,10 +68,16 @@ protected:
 	ST::GyroscopeEvent _gyroscopeEvent;
 	ST::AccelerometerEvent _accelerometerEvent;
 
-	std::atomic<bool> _isStreaming   = false;
-	bool _streamOnReady = false;  // start streaming when Ready event received
-	bool _isFrameNew    = false;
-	bool _depthDirty, _irDirty, _visibleDirty = false;
+	std::atomic<bool>
+	    _isInit,               // called setup()
+	    _isReady,              // got ready signal from SDK
+	    _isStreaming = false;  // got streaming signal from SDK
+
+	bool _streamOnReady,  // should call start() on ready signal from SDK
+	    _isFrameNew,
+	    _depthDirty,
+	    _irDirty,
+	    _visibleDirty = false;
 	ST::Intrinsics _depthIntrinsics;
 	ofShader _transformFbShader;        // converts depth image to point cloud
 	ofBufferObject _transformFbBuffer;  // gpu buffer for point cloud
