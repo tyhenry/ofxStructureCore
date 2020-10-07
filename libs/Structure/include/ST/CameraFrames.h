@@ -1,7 +1,7 @@
 /*
     CameraFrames.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -154,8 +154,14 @@ struct ST_API DepthFrame
     /** @brief Contiguous chunk of `width * height` float depth values in millimeters. */
     const float* depthInMillimeters() const;
 
+    /** @brief Contiguous chunk of width * height float depth values in meters. */
+    const float* depthInMeters() const;
+
     /** @brief Convert depth values into their respective RGBA values. Useful for rendering depth in a helpful way. */
     const uint8_t* convertDepthToRgba() const;
+
+    /** @brief Convert depth values into millimeters as unsigned short. */
+    const uint16_t* convertDepthToUShortInMillimeters() const;
 
     /** @brief Returns depth in millimeters at (x,y) if it exists, NAN otherwise. */
     float operator()(int x, int y) const;

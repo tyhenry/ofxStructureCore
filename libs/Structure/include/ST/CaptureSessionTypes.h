@@ -1,7 +1,7 @@
 /*
     CaptureSessionTypes.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -86,6 +86,10 @@ enum class CaptureSessionEventId
 
     /** The sensor was configured correctly and is streaming data successfully. */
     Streaming,
+
+    /** The sensor was detected but has not been initialized yet. Call startMonitoring on the
+        CaptureSession to initialize the device. */
+    Detected,
 };
 
 /** @brief Describes the USB version and speed by which a Structure Core sensor is connected. */
@@ -102,6 +106,24 @@ enum class CaptureSessionUSBVersion
 
     /** USB 3.x interface (SuperSpeed 5+ Gbps or better). Preferred. All streams are supported at full sample rate in this mode, provided the host USB interface has sufficient bandwidth available for bulk transfers. */
     USB3,
+};
+
+/** @brief Describes the Camera Type connected to the Structure Core sensor. */
+enum class StructureCoreCameraType
+{
+    /** Default return value. */
+    Invalid = -1,
+
+    /** Black and white color scheme. */
+    Monochrome,
+
+    /** Visible light color scheme. */
+    Color,
+
+    /** Not using Monochrome or Color. */
+    Other,
+
+    HowMany,
 };
 
 /** @brief Information about the Structure Core sensor currently in use by a CaptureSession. See CaptureSession::sensorInfo. */
@@ -123,6 +145,7 @@ struct ST_API CaptureSessionSensorInfo
     {
         FirmwareVersion driverFirmwareVersion;
         FirmwareVersion sensorFirmwareVersion;
+        float temperature;
     } structureCore;
 
     char serialNumber[256];
@@ -205,6 +228,15 @@ struct ST_API CaptureSessionSample
     CaptureSessionSample(const CaptureSessionSample& other);
 
     void* reserved;
+};
+
+//------------------------------------------------------------------------------
+
+/** @brief Specifies which property to request/set. */
+enum class CaptureSessionProperty
+{
+    /** @brief Specifies whether the StereoPassthroughTester is enabled. */
+    StereoPassthroughTesterEnabled,
 };
 
 //------------------------------------------------------------------------------

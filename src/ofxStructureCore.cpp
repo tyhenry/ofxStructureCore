@@ -2,7 +2,12 @@
 
 ofxStructureCore::ofxStructureCore()
 {
-	_captureSession.setDelegate( this );
+	//_captureSession.setDelegate( this );
+	auto* dm = &ofx::structure::deviceManager();  // init
+}
+
+ofxStructureCore::~ofxStructureCore()
+{
 }
 
 bool ofxStructureCore::setup( const Settings& settings )
@@ -10,9 +15,13 @@ bool ofxStructureCore::setup( const Settings& settings )
 	_settings      = settings;
 	_isInit        = false;
 	_streamOnReady = false;  // wait until user calls start() to startStreaming()
-	if ( _captureSession.startMonitoring( settings ) ) {
+	auto serial    = settings.getSerial();
+
+	if ( !serial.empty() ) ofx::structure::deviceManager().attach( serial, this );
+
+	if ( _captureSession && _captureSession->startMonitoring( settings ) ) {
 		_isInit = true;
-		ofLogNotice( ofx_module() ) << "Sensor " << ( serial().empty() ? "" : "[" + serial() + "]" ) << " session initialized.";
+		ofLogNotice( ofx_module() ) << "Sensor " << ( serial.empty() ? "" : "[" + serial + "] " ) << "session initialized.";
 		// HACK: if we have requested a serial number, the Structure SDK needs this thread to sleep for a bit before we can call startStreaming()
 		// very weird, but seems like the only fix right now
 		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
@@ -36,6 +45,7 @@ bool ofxStructureCore::start( float timeout )
 	}
 
 	if ( !_isReady ) {
+		if ( _captureSession ) _isReady = true;
 
 		if ( timeout > 0. ) {
 
@@ -57,7 +67,7 @@ bool ofxStructureCore::start( float timeout )
 
 	if ( _isReady ) {
 
-		if ( _captureSession.startStreaming() ) {
+		if ( _captureSession && _captureSession->startStreaming() ) {
 			ofLogVerbose( ofx_module() ) << "Requested sensor [" << serial() << "] start streaming.";
 			return true;
 
@@ -73,7 +83,7 @@ bool ofxStructureCore::start( float timeout )
 
 void ofxStructureCore::stop()
 {
-	_captureSession.stopStreaming();
+	if ( _captureSession ) _captureSession->stopStreaming();
 	_isStreaming   = false;
 	_streamOnReady = false;
 }
@@ -138,14 +148,14 @@ inline const glm::vec3 ofxStructureCore::getGyroRotationRate()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto r = _gyroscopeEvent.rotationRate();
-	return {r.x, r.y, r.z};
+	return { r.x, r.y, r.z };
 }
 
 inline const glm::vec3 ofxStructureCore::getAcceleration()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto a = _accelerometerEvent.acceleration();
-	return {a.x, a.y, a.z};
+	return { a.x, a.y, a.z };
 }
 
 // static methods
@@ -153,33 +163,22 @@ inline const glm::vec3 ofxStructureCore::getAcceleration()
 std::vector<std::string> ofxStructureCore::listDevices( bool bLog )
 {
 
-	std::vector<std::string> devices;
-	const ST::ConnectedSensorInfo* sensors[]{nullptr, nullptr, nullptr};
-	int count;
-	ST::enumerateConnectedSensors( sensors, &count );
-	std::stringstream devices_ss;
-	for ( int i = 0; i < count; ++i ) {
-		if ( sensors && sensors[i] ) {
-			if ( bLog ) {
-				devices_ss << "\n\t" << i << ": "
-				           << "serial [" << sensors[i]->serial << "], "
-				           << "product: " << sensors[i]->product << ", "
-				           << std::boolalpha
-				           << "available: " << sensors[i]->available << ", "
-				           << "booted: " << sensors[i]->booted << std::endl;
-			}
-			devices.emplace_back( &( sensors[i]->serial[0] ) );
-		}
-	}
+	std::vector<std::string> serials = ofx::structure::deviceManager().listDetectedSerials();
+
 	if ( bLog ) {
-		ofLogNotice( ofx_module() ) << "\nFound " << devices.size() << " Structure Core devices: " << devices_ss.str();
+		std::stringstream ss;
+		for ( int i = 0; i < serials.size(); ++i ) {
+			ss << "\n\t" << i << ": "
+			   << "serial [" << serials[i] << "]\n";
+		}
+		ofLogNotice( ofx_module() ) << "\nFound " << serials.size() << " Structure Core devices: " << ss.str();
 	}
-	return devices;
+	return serials;
 }
 
 // protected callback handlers -- not to be called directly:
 
-inline void ofxStructureCore::handleNewFrame( const Frame& frame )
+void ofxStructureCore::handleNewFrame( const Frame& frame )
 {
 	if ( _lastFrameT == 0. ) {
 		_lastFrameT = ofGetElapsedTimef();
@@ -245,36 +244,23 @@ inline void ofxStructureCore::handleNewFrame( const Frame& frame )
 	}
 }
 
-inline void ofxStructureCore::handleSessionEvent( EventType evt )
+void ofxStructureCore::handleSessionEvent( EventType evt )
 {
 	const std::string id = serial();
 	switch ( evt ) {
-		case ST::CaptureSessionEventId::Booting:
-			ofLogVerbose( ofx_module() ) << "StructureCore is booting...";
-			break;
+		case ST::CaptureSessionEventId::Connected:
 		case ST::CaptureSessionEventId::Ready:
-			ofLogNotice( ofx_module() ) << "Sensor " << id << " is ready.";
 			_isReady = true;
 			if ( _streamOnReady ) {
 				start( 0. );  // start streaming
 			}
 			break;
-		case ST::CaptureSessionEventId::Connected:
-			ofLogVerbose( ofx_module() ) << "Sensor " << id << " is connected.";
-			break;
 		case ST::CaptureSessionEventId::Streaming:
-			ofLogVerbose( ofx_module() ) << "Sensor " << id << " is streaming.";
 			_isStreaming = true;
 			break;
 		case ST::CaptureSessionEventId::Disconnected:
-			ofLogError( ofx_module() ) << "Sensor " << id << " - Disconnected!";
 			_isStreaming = false;
 			break;
-		case ST::CaptureSessionEventId::Error:
-			ofLogError( ofx_module() ) << "Sensor " << id << " - Capture error!";
-			break;
-		default:
-			ofLogWarning( ofx_module() ) << "Sensor " << id << " - Unhandled capture session event type: " << Frame::toString( evt );
 	}
 }
 
@@ -301,7 +287,7 @@ void ofxStructureCore::updatePointCloud()
 			ofShader::TransformFeedbackSettings settings;
 			settings.shaderSources[GL_VERTEX_SHADER] = ofx::structure::depth_to_points_vert_shader;
 			settings.bindDefaults                    = false;
-			settings.varyingsToCapture               = {"vPosition"};
+			settings.varyingsToCapture               = { "vPosition" };
 			if ( _transformFbShader.setup( settings ) ) {
 				ofLogVerbose( ofx_module() ) << "Loaded transform feedback shader.";
 			} else {

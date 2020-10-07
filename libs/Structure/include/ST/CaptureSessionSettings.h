@@ -1,7 +1,7 @@
 /*
     CaptureSessionSettings.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -219,13 +219,13 @@ enum class StructureCoreIMUUpdateRate
 
     AccelAndGyro_100Hz,
     AccelAndGyro_200Hz,
-    AccelAndGyro_800Hz,
+    AccelAndGyro_400Hz,
     AccelAndGyro_1000Hz,
 
     HowMany,
 
     // Aliases
-    Default = AccelAndGyro_800Hz,
+    Default = AccelAndGyro_400Hz,
 };
 
 //------------------------------------------------------------------------------
@@ -277,8 +277,14 @@ struct ST_API CaptureSessionSettings
     /** @brief Set to true to enable frame synchronization between visible or color and depth. */
     bool frameSyncEnabled = true;
 
-    /** @brief Set to true to deliver IMU events on a separate, dedicated background thread. */
-    bool lowLatencyIMU = true;
+    /** @brief Set to true to deliver latency events */
+    bool reportLatency = false;
+
+    /** @brief Set to true to collect metrics */
+    bool collectRealtimeMetrics = false;
+
+    /** @brief Set to true to see realtime metrics, require collectRealtimeMetrics to be true. */
+    bool showRealtimeMetrics = false;
 
     /** @brief Set to true to apply a correction and clean filter to the depth before streaming, such that depth frames
         received from the driver are post-processed before arrival. This may effect streaming performance,
@@ -349,7 +355,7 @@ struct ST_API CaptureSessionSettings
         const char* firmwareBootPath = nullptr;
 
         /** @brief Maximum amount of time (in milliseconds) to wait for a sensor to connect before throwing a timeout error. */
-        int sensorInitializationTimeout = 6000;
+        int sensorInitializationTimeout = 15000;
 
         /** @brief The target framerate for the infrared camera. If the value is not supported, the default is 30. */
         float infraredFramerate = 30.f;
@@ -378,8 +384,27 @@ struct ST_API CaptureSessionSettings
         /** @brief Setting this to true will reduce latency, but might drop more frame */
         bool latencyReducerEnabled = true;
 
+        /** @brief Setting this to true/false will turn on/off laser projector*/
+        bool projectorPowerEnabled = true;
+
         /** @brief The dynamic calibration mode to use during depth streaming. */
         StructureCoreDynamicCalibrationMode dynamicCalibrationMode = StructureCoreDynamicCalibrationMode::Default;
+
+        /** @brief Register an Android USB device file descriptor with the Structure
+            Core driver. Return true if the file descriptor was successfully
+            registered and corresponds to a usable Structure Core device, otherwise
+            false.
+
+            USB device file descriptors can be obtained using the Android API class
+            UsbDeviceConnection. This function internally duplicates the file
+            descriptor to allow the caller to close the UsbDeviceConnection
+            immediately after registration.
+
+            Attempting to register the same file descriptor twice will cause
+            undesired behavior.
+
+            This function is Android-only. */
+        int usbFileDescriptor = -1;
     }
     structureCore;
 
@@ -409,8 +434,10 @@ struct ST_API CaptureSessionSettings
     /** @brief The android looper will be auto-created for the thread calling startStreaming, when unspecified. Android-only. */
     ALooper* looper = nullptr;
 
-    /** @brief Attempts to read presaved settings from "[Documents]/CaptureSessionSettings.json". */
-    void readSavedSettings();
+    /** @brief Attempts to read presaved settings from "[Documents]/CaptureSessionSettings.json".
+        @return True, if able to find and parse the file, otherwise false.
+    */
+    bool readSavedSettings();
 
     /** @brief Writes the current state of the struct into "[Documents]CaptureSessionSettings.json". */
     void persistCaptureSettings();

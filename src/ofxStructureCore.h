@@ -1,18 +1,22 @@
 #include "ST/CameraFrames.h"
 #include "ST/CaptureSession.h"
+#include "ST/DeviceManager.h"
 #include "ST/IMUEvents.h"
 #include "ST/OCCFileWriter.h"
 #include "ST/Utilities.h"
 #include "ofMain.h"
+#include "ofxStructureCoreDelegate.h"
 #include "ofxStructureCoreSettings.h"
 #include "ofxStructureCoreUtils.h"
 
-class ofxStructureCore : public ST::CaptureSessionDelegate
+class ofxStructureCore
 {
 public:
+	friend class ofx::structure::DeviceManager;
 	using Settings = ofx::structure::Settings;
 
 	ofxStructureCore();
+	~ofxStructureCore();
 
 	bool setup( const Settings& settings );  // call to init device
 	bool start( float timeout = 0.f );       // start streaming (if not already), wait timeout sec for response or if timeout == 0, start async
@@ -25,7 +29,7 @@ public:
 	const bool isStreaming() const { return _isStreaming; }  // sensor has started
 	const std::string serial() const
 	{
-		auto serial = std::string( &_captureSession.sensorInfo().serialNumber[0] );
+		auto serial = _captureSession ? std::string( &_captureSession->sensorInfo().serialNumber[0] ) : "";
 		if ( serial.empty() ) {
 			serial = _settings.getSerial();  // no sensor initialzed, fallback to settings
 		}
@@ -54,7 +58,7 @@ public:
 	} pointcloud;
 
 protected:
-	ST::CaptureSession _captureSession;
+	ST::CaptureSession* _captureSession;
 	Settings _settings;
 
 	std::mutex _frameLock;  // delegate receives frames on background thread
@@ -95,19 +99,5 @@ protected:
 	{
 		static const std::string name = "ofxStructureCore";
 		return name;
-	}
-
-public:
-	// delegate functions overrides
-	void captureSessionEventDidOccur( ST::CaptureSession* session, ST::CaptureSessionEventId evt ) override
-	{
-		if ( session == &_captureSession )
-			handleSessionEvent( evt );
-		else
-			ofLogError( ofx_module() ) << "Received capture session event for unknown capture session: " << ( int )session;
-	}
-	void captureSessionDidOutputSample( ST::CaptureSession*, const ST::CaptureSessionSample& sample ) override
-	{
-		handleNewFrame( sample );
 	}
 };

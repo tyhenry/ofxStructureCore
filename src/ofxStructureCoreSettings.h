@@ -19,31 +19,35 @@ namespace structure {
 	inline const std::map<ST::StructureCoreDepthResolution, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDepthResolution, std::string> names = {
-		    {ST::StructureCoreDepthResolution::_320x240, "320x240"},
-		    {ST::StructureCoreDepthResolution::_640x480, "640x480"},
-		    {ST::StructureCoreDepthResolution::_1280x960, "1280x960"},
-		    {ST::StructureCoreDepthResolution::VGA, "VGA"},
-		    {ST::StructureCoreDepthResolution::SXGA, "SXGA"},
-		    {ST::StructureCoreDepthResolution::QVGA, "QVGA"}};
+		    { ST::StructureCoreDepthResolution::_320x240, "320x240" },
+		    { ST::StructureCoreDepthResolution::_640x480, "640x480" },
+		    { ST::StructureCoreDepthResolution::_1280x960, "1280x960" },
+		    { ST::StructureCoreDepthResolution::VGA, "VGA" },
+		    { ST::StructureCoreDepthResolution::SXGA, "SXGA" },
+		    { ST::StructureCoreDepthResolution::QVGA, "QVGA" } };
 		return names;
 	};
+
 	template <>
 	inline const std::map<ST::StructureCoreDepthRangeMode, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDepthRangeMode, std::string> names = {
-		    {ST::StructureCoreDepthRangeMode::Short, "Short"},
-		    {ST::StructureCoreDepthRangeMode::Medium, "Medium"},
-		    {ST::StructureCoreDepthRangeMode::Long, "Long"},
-		    {ST::StructureCoreDepthRangeMode::Hybrid, "Hybrid"}};
+		    { ST::StructureCoreDepthRangeMode::VeryShort, "VeryShort" },  // 0.35 - 0.92m
+		    { ST::StructureCoreDepthRangeMode::Short, "Short" },          // 0.41 - 1.36m
+		    { ST::StructureCoreDepthRangeMode::Medium, "Medium" },        // 0.52 - 5.23m
+		    { ST::StructureCoreDepthRangeMode::Long, "Long" },            // 0.58 - 8.0m
+		    { ST::StructureCoreDepthRangeMode::VeryLong, "VeryLong" },    // 0.58 - 10.0m
+		    { ST::StructureCoreDepthRangeMode::Hybrid, "Hybrid" } };      // 0.35 - 10.0m
 		return names;
 	};
+
 	template <>
 	inline const std::map<ST::StructureCoreDynamicCalibrationMode, std::string>& type_to_str_map()
 	{
 		static const std::map<ST::StructureCoreDynamicCalibrationMode, std::string> names = {
-		    {ST::StructureCoreDynamicCalibrationMode::Off, "Off"},
-		    {ST::StructureCoreDynamicCalibrationMode::OneShotPersistent, "OneShotPersistent"},
-		    {ST::StructureCoreDynamicCalibrationMode::ContinuousNonPersistent, "ContinuousNonPersisent"}};
+		    { ST::StructureCoreDynamicCalibrationMode::Off, "Off" },
+		    { ST::StructureCoreDynamicCalibrationMode::OneShotPersistent, "OneShotPersistent" },
+		    { ST::StructureCoreDynamicCalibrationMode::ContinuousNonPersistent, "ContinuousNonPersisent" } };
 		return names;
 	};
 

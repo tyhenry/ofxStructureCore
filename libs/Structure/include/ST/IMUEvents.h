@@ -1,7 +1,7 @@
 /*
     IMUEvents.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -87,6 +87,9 @@ struct ST_API GyroscopeEvent
 
     /** @brief Returns the generation timestamp of the gyroscope event, in seconds. */
     double timestamp() const;
+
+    /** @brief Return the timestamp at which the accelerometer event was received by the host, in seconds relative to an unspecified epoch. */
+    double arrivalTimestamp() const;
 
     /** @brief Return the raw 3-axis (rotation vector, i.e. angle-axis) gyroscope data in radians per second. */
     RotationRate rotationRate() const;

@@ -1,7 +1,7 @@
 /*
     OCCFileWriter.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -28,10 +28,11 @@ struct ST_API OCCFileWriter
 
     /** @brief Initialize OCC recording and create the initial OCC file.
         @param path The fullpath of where to store the OCC file.
+        @param captureSession The CaptureSession instance that will stream images to record. Will also utilize the device serial in the final OCC filename.
         @param useH264 Not available on Windows. If true, images will be saved using H264 compression.
         @return True, if the OCC file was created and OCC recording can happen. Otherwise, false.
     */
-    bool startWritingToFile(const char* path, bool useH264 = false);
+    bool startWritingToFile(const char* path, const CaptureSession& captureSession, bool useH264 = false);
 
     /** @brief Wait for all queued data to be written to the file and flush to the drive. */
     void finalizeWriting();

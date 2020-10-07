@@ -1,7 +1,7 @@
 /*
     Utilities.h
 
-    Copyright © 2017 Occipital, Inc. All rights reserved.
+    Copyright © 2020 Occipital, Inc. All rights reserved.
     This file is part of the Structure SDK.
     Unauthorized copying of this file, via any medium is strictly prohibited.
     Proprietary and confidential.
@@ -72,44 +72,6 @@ namespace ST
     ST_API bool floatEquals(float rhs, float lhs);
 
     //------------------------------------------------------------------------------
-
-    /** @brief Information describing a connected Structure Core device. */
-    struct ST_API ConnectedSensorInfo
-    {
-        /** @brief Name of sensor manufacturer */
-        char manufacturer[256];
-
-        /** @brief Product name of sensor */
-        char product[256];
-
-        /** @brief Serial number of sensor */
-        char serial[256];
-
-        /** @brief Is the sensor booted? Always true in normal usage. */
-        bool booted = false;
-
-        /** @brief Is the sensor available to use? False if already in use by another process. */
-        bool available = false;
-    };
-
-    /** @brief Return all connected Structure Core devices and the number of connected Structure Cores (Max number is up to 10). Unavailable on Android. */
-    ST_API bool enumerateConnectedSensors(const ConnectedSensorInfo* sensors[], int* numDevices);
-
-    /** @brief Register an Android USB device file descriptor with the Structure
-        Core driver. Return true if the file descriptor was successfully
-        registered and corresponds to a usable Structure Core device, otherwise
-        false.
-
-        USB device file descriptors can be obtained using the Android API class
-        UsbDeviceConnection. This function internally duplicates the file
-        descriptor to allow the caller to close the UsbDeviceConnection
-        immediately after registration.
-
-        Attempting to register the same file descriptor twice will cause
-        undesired behavior.
-
-        This function is Android-only. */
-    ST_API bool registerSensorByUSBFileDescriptor(int fileDescriptor);
 
 
 }  // ST namespace
