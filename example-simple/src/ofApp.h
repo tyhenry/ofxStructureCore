@@ -26,4 +26,10 @@ public:
 
 	ofxStructureCore structure;
 	ofEasyCam cam;
+
+	ofRectangle irGainSlider, irExposureSlider;
+	ofParameter<float> irGain{ "ir gain", 1., 0., 3. };
+	ofParameter<float> irExposure{ "ir exposure", 0.016f, 0., 0.03 };
+	bool irSlidersActive = false;
+	bool startedStream = false;
 };

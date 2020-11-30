@@ -117,8 +117,10 @@ void ofxStructureCore::update()
 			_depthIntrinsics = _depthFrame.intrinsics();
 		}
 		depthImg.update();
-		// update point cloud
-		updatePointCloud();
+
+		if ( _settings.generatePointCloud ) {
+			updatePointCloud();  // update point cloud vbo
+		}
 		_depthDirty = false;
 	}
 	if ( _irDirty ) {
@@ -144,6 +146,79 @@ void ofxStructureCore::update()
 	}
 }
 
+void ofxStructureCore::drawDepthRange( float mmMin, float mmMax, float x, float y, float w, float h )
+{
+
+	if ( ofIsGLProgrammableRenderer() && depthImg.isAllocated() ) {
+
+		if ( w == 0.f ) w = depthImg.getWidth();
+		if ( h == 0.f ) h = depthImg.getHeight();
+
+		// load shader
+		if ( !_rangeMapShader.isLoaded() ) {
+			_rangeMapShader.setupShaderFromSource( GL_VERTEX_SHADER, ofx::structure::map_range_vert_shader );
+			_rangeMapShader.setupShaderFromSource( GL_FRAGMENT_SHADER, ofx::structure::map_range_frag_shader );
+			_rangeMapShader.bindDefaults();
+			if ( _rangeMapShader.linkProgram() ) {
+				ofLogVerbose( ofx_module() ) << "Loaded depth range map shader.";
+			} else {
+				ofLogError( ofx_module() ) << "Error loading depth range map shader!";
+			}
+		}
+
+		if ( _rangeMapShader.isLoaded() && depthImg.isAllocated() ) {
+			// map depth range
+			_rangeMapShader.begin();
+			_rangeMapShader.setUniform4f( "inMin", glm::vec4( mmMin, mmMin, mmMin, 0.f ) );
+			_rangeMapShader.setUniform4f( "inMax", glm::vec4( mmMax, mmMax, mmMax, 1.f ) );
+			_rangeMapShader.setUniform4f( "outMin", glm::vec4( 0.0 ) );
+			_rangeMapShader.setUniform4f( "outMax", glm::vec4( 1.0 ) );
+			depthImg.draw( x, y, w, h );  // binds to tex0
+			_rangeMapShader.end();
+		}
+	}
+}
+
+void ofxStructureCore::drawDepth( float x, float y, float w, float h )
+{
+	float mmMin = 0.0;
+	float mmMax = 1.0;
+	_settings.minMaxDepthInMmOfDepthRangeMode( _settings.structureCore.depthRangeMode, mmMin, mmMax );
+	drawDepthRange( mmMin, mmMax, x, y, w, h );
+}
+
+void ofxStructureCore::drawInfrared( float x, float y, float w, float h )
+{
+	if ( ofIsGLProgrammableRenderer() && irImg.isAllocated() ) {
+
+		if ( w == 0.f ) w = irImg.getWidth();
+		if ( h == 0.f ) h = irImg.getHeight();
+
+		// load shader
+		if ( !_rangeMapShader.isLoaded() ) {
+			_rangeMapShader.setupShaderFromSource( GL_VERTEX_SHADER, ofx::structure::map_range_vert_shader );
+			_rangeMapShader.setupShaderFromSource( GL_FRAGMENT_SHADER, ofx::structure::map_range_frag_shader );
+			_rangeMapShader.bindDefaults();
+			if ( _rangeMapShader.linkProgram() ) {
+				ofLogVerbose( ofx_module() ) << "Loaded range map shader.";
+			} else {
+				ofLogError( ofx_module() ) << "Error loading range map shader!";
+			}
+		}
+
+		if ( _rangeMapShader.isLoaded() && irImg.isAllocated() ) {
+			// map depth range
+			_rangeMapShader.begin();
+			_rangeMapShader.setUniform4f( "inMin", glm::vec4( glm::vec3( 0.f ), 0.f ) );
+			_rangeMapShader.setUniform4f( "inMax", glm::vec4( glm::vec3( 1023.f / 65535.f ), 1.f ) );
+			_rangeMapShader.setUniform4f( "outMin", glm::vec4( glm::vec3( 0.f ), 1.f ) );
+			_rangeMapShader.setUniform4f( "outMax", glm::vec4( glm::vec3( 1.f ), 1.f ) );
+			irImg.draw( x, y, w, h );  // binds to tex0
+			_rangeMapShader.end();
+		}
+	}
+}
+
 inline const glm::vec3 ofxStructureCore::getGyroRotationRate()
 {
 	std::unique_lock<std::mutex> lck( _frameLock );
@@ -156,6 +231,29 @@ inline const glm::vec3 ofxStructureCore::getAcceleration()
 	std::unique_lock<std::mutex> lck( _frameLock );
 	auto a = _accelerometerEvent.acceleration();
 	return { a.x, a.y, a.z };
+}
+
+ST::Intrinsics ofxStructureCore::getIntrinsics()
+{
+	return _depthIntrinsics;
+}
+
+bool ofxStructureCore::setIrExposureAndGain( float exposure, float gain )
+{
+	if ( _captureSession ) {
+		_captureSession->setInfraredCamerasExposureAndGain( exposure, gain );  // no way to check if fail?
+		return true;
+	}
+	return false;
+}
+
+glm::vec2 ofxStructureCore::getIrExposureAndGain()
+{
+	glm::vec2 r{ 0, 0 };
+	if ( _captureSession ) {
+		_captureSession->getInfraredCamerasExposureAndGain( &r.x, &r.y );
+	}
+	return r;
 }
 
 // static methods
@@ -257,6 +355,10 @@ void ofxStructureCore::handleSessionEvent( EventType evt )
 			break;
 		case ST::CaptureSessionEventId::Streaming:
 			_isStreaming = true;
+			// enforce ir exposure and gain - seems to be issues with initial settings
+			if ( _settings.structureCore.infraredEnabled && !_settings.structureCore.infraredAutoExposureEnabled ) {
+				_captureSession->setInfraredCamerasExposureAndGain( _settings.structureCore.initialInfraredExposure, _settings.structureCore.initialInfraredGain );
+			}
 			break;
 		case ST::CaptureSessionEventId::Disconnected:
 			_isStreaming = false;
@@ -297,14 +399,14 @@ void ofxStructureCore::updatePointCloud()
 
 		// allocate transform input vbo (with blank vert data)
 		if ( _transformFbVbo.getNumVertices() != nVerts ) {
-			std::vector<glm::vec3> tmp( nVerts );
-			_transformFbVbo.setVertexData( tmp.data(), nVerts, GL_STATIC_DRAW );
-
-			// set static tex coord data here for point cloud vbo since we are updating the size anyway
-			std::vector<glm::vec2> tcs( nVerts );
+			std::vector<glm::vec3> vts( nVerts );  // verts
+			std::vector<glm::vec2> tcs( nVerts );  // tex coords
 			for ( int i = 0; i < nVerts; ++i ) {
-				tcs[i] = glm::vec2( i % pointcloud.width, i / pointcloud.width );  // todo: normalized tex coords?
+				tcs[i] = glm::vec2( i % pointcloud.width, i / pointcloud.width );                           // row, col
+				vts[i] = glm::vec3( tcs[i] - glm::vec2( pointcloud.width, pointcloud.height ) * .5f, 0. );  //
 			}
+			_transformFbVbo.setVertexData( vts.data(), nVerts, GL_STATIC_DRAW );
+			pointcloud.vbo.setVertexData( vts.data(), nVerts, GL_STATIC_DRAW );
 			pointcloud.vbo.setTexCoordData( tcs.data(), tcs.size(), GL_STATIC_DRAW );
 		}
 

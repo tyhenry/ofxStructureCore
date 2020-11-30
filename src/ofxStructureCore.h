@@ -23,6 +23,13 @@ public:
 	void stop();
 	void update();
 
+	void drawDepthRange( float mmMin, float mmMax, float x = 0.f, float y = 0.f, float w = 0.f, float h = 0.f );
+	void drawDepth( float x = 0, float y = 0 ) { drawDepth( x, y, depthImg.getWidth(), depthImg.getHeight() ); }
+	void drawDepth( float x, float y, float w, float h );
+
+	void drawInfrared( float x = 0, float y = 0 ) { drawInfrared( x, y, irImg.getWidth(), irImg.getHeight() ); }
+	void drawInfrared( float x, float y, float w, float h );
+
 	const bool isFrameNew() const { return _isFrameNew; }
 	const bool isInit() const { return _isInit; }            // setup() was called
 	const bool isReady() const { return _isReady; }          // sensor is ready to start()
@@ -38,12 +45,17 @@ public:
 
 	const glm::vec3 getGyroRotationRate();
 	const glm::vec3 getAcceleration();
+	ST::Intrinsics getIntrinsics();
+	const Settings& getSettings() { return _settings; }
+
+	bool setIrExposureAndGain( float exposure, float gain );
+	glm::vec2 getIrExposureAndGain();
 
 	// static methods
 	static std::vector<std::string> listDevices( bool bLog );
 	static void setLogLevel( ofLogLevel lvl ) { ofSetLogLevel( ofx_module(), lvl ); }
 
-	ofFloatImage depthImg;  // float data is in mm (0 - 65355)
+	ofFloatImage depthImg;  // float data is in mm
 	ofShortImage irImg;
 	ofImage visibleImg;
 
@@ -83,6 +95,7 @@ protected:
 	    _irDirty,
 	    _visibleDirty = false;
 	ST::Intrinsics _depthIntrinsics;
+	ofShader _rangeMapShader;           // maps mm depth range to visible range 0-1
 	ofShader _transformFbShader;        // converts depth image to point cloud
 	ofBufferObject _transformFbBuffer;  // gpu buffer for point cloud
 	ofVbo _transformFbVbo;              // static vbo for transform fb

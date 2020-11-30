@@ -20,7 +20,7 @@ namespace structure {
 			settings.structureCore.depthResolution = ST::StructureCoreDepthResolution::VGA;
 			settings.structureCore.depthFramerate  = 30.f;
 
-			settings.structureCore.infraredEnabled   = false;
+			settings.structureCore.infraredEnabled   = true;
 			settings.structureCore.infraredFramerate = 30.f;
 
 			settings.structureCore.visibleEnabled   = false;
@@ -31,8 +31,8 @@ namespace structure {
 			settings.structureCore.gyroscopeEnabled     = false;
 
 			settings.structureCore.depthRangeMode          = ST::StructureCoreDepthRangeMode::Medium;
-			settings.structureCore.initialInfraredExposure = 0.020f;
-			settings.structureCore.initialInfraredGain     = 1;
+			//settings.structureCore.initialInfraredExposure = 0.020f;
+			//settings.structureCore.initialInfraredGain     = 1;
 
 			//settings.structureCore.sensorSerial = dummySerial.c_str();
 

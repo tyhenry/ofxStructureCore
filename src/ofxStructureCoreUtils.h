@@ -4,7 +4,72 @@
 namespace ofx {
 namespace structure {
 
-	static const std::string depth_to_points_vert_shader = R"(
+	const std::string map_range_vert_shader = R"(
+	#version 150
+	uniform mat4 textureMatrix;
+	uniform mat4 modelViewProjectionMatrix;
+
+	in vec4 position;
+	in vec2 texcoord; 
+	out vec2 vTexcoord;
+
+	void main()
+	{
+		vTexcoord	= (textureMatrix*vec4(texcoord.x,texcoord.y,0,1)).xy;
+		gl_Position	= modelViewProjectionMatrix * position;
+	}
+	)";
+
+	const std::string map_range_frag_shader = R"(
+	#version 150
+	in vec2 vTexcoord;
+	out vec4 fragColor;
+
+	uniform vec4 inMin = vec4(0.0);
+	uniform vec4 inMax = vec4(1.0);
+	uniform vec4 outMin = vec4(0.0);
+	uniform vec4 outMax = vec4(1.0);
+
+	uniform sampler2DRect tex0;
+
+	void main()
+	{
+		vec4 color = texture( tex0, vTexcoord );
+		fragColor = (color - inMin) / (inMax - inMin) * (outMax - outMin) + outMin;
+	}
+	)";
+
+	const std::string ir_vert_shader = R"(
+	#version 150
+	uniform mat4 textureMatrix;
+	uniform mat4 modelViewProjectionMatrix;
+
+	in vec4 position;
+	in vec2 texcoord; 
+	out vec2 vTexcoord;
+
+	void main()
+	{
+		vTexcoord	= (textureMatrix*vec4(texcoord.x,texcoord.y,0,1)).xy;
+		gl_Position	= modelViewProjectionMatrix * position;
+	}
+	)";
+
+	const std::string ir_frag_shader = R"(
+	#version 150
+	in vec2 vTexcoord;
+	out vec4 fragColor;
+
+	uniform sampler2DRect tex0;
+
+	void main()
+	{
+		vec4 color = texture( tex0, vTexcoord );
+		fragColor = vec4( vec3( color.rrr / 1023. ), 1. );
+	}
+	)";
+
+	const std::string depth_to_points_vert_shader = R"(
 	#version 150
 
 	// -----------------------------------------------------------------------
@@ -55,15 +120,15 @@ namespace structure {
 		pos		*= is_true( vValid );					// zeroes xyz if invalid
 		pos.xy	+= ray.xy * is_false( vValid );			// sets xy to ray.xy if invalid
 
-		// Flip X as OpenGL and K4A have different conventions on which direction is positive.
+		// Flip XY as OpenGL has different conventions on which direction is positive.
 		pos.xy *= -1;
 
-		// our position output, in kinect camera space (mm, world space with kinect as origin)
+		// our position output, in camera space (mm, world space with kinect as origin)
 		vPosition =  pos;	// modelViewMatrix * pos would allow changing depth camera transform 
 
 		gl_Position = modelViewProjectionMatrix * vec4(pos,1.);		// for rendering
 	}
 
 )";
-}
+}  // namespace structure
 }  // namespace ofx
